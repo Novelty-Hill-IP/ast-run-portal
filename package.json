@@ -9,8 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@azure/identity": "^4.10.1",
-    "@azure/msal-node": "^3.6.1",
     "@azure/storage-blob": "^12.27.0",
     "@hookform/resolvers": "^5.1.1",
     "@radix-ui/react-label": "^2.1.7",
@@ -25,6 +23,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.58.1",
+    "sonner": "^2.0.5",
     "tailwind-merge": "^3.3.1",
     "xlsx": "^0.18.5",
     "zod": "^3.25.67"
