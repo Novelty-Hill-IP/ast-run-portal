@@ -26,6 +26,10 @@ interface RunSummaryProps {
 	runData: RunData;
 }
 
+interface RunDetailsProps {
+	runData: RunData;
+}
+
 // Components
 const SheetAnalysis = ({ title, recordCount, headers }: SheetAnalysisProps) => (
 	<Card>
@@ -53,9 +57,49 @@ const SheetAnalysis = ({ title, recordCount, headers }: SheetAnalysisProps) => (
 	</Card>
 );
 
+const RunDetails = ({ runData }: RunDetailsProps) => (
+	<div className="space-y-4">
+		<div className="space-y-2">
+			<h3 className="text-sm font-medium text-muted-foreground">
+				Run Name
+			</h3>
+			<p className="text-lg font-semibold">{runData.runName}</p>
+		</div>
+
+		{runData.client && (
+			<div className="space-y-2">
+				<h3 className="text-sm font-medium text-muted-foreground">
+					Client
+				</h3>
+				<p className="text-base">{runData.client}</p>
+			</div>
+		)}
+
+		{runData.description && (
+			<div className="space-y-2">
+				<h3 className="text-sm font-medium text-muted-foreground">
+					Description
+				</h3>
+				<p className="text-base whitespace-pre-wrap">
+					{runData.description}
+				</p>
+			</div>
+		)}
+
+		<div className="space-y-2">
+			<h3 className="text-sm font-medium text-muted-foreground">File</h3>
+			<div className="flex items-center space-x-2">
+				<Badge variant="secondary">{runData.fileName}</Badge>
+				<span className="text-sm text-muted-foreground">
+					({(runData.fileSize / 1024 / 1024).toFixed(2)} MB)
+				</span>
+			</div>
+		</div>
+	</div>
+);
+
 const RunSummary = ({ runData }: RunSummaryProps) => {
-	const lotsCount = runData.excelData.lotsCount;
-	const patentsCount = runData.excelData.patentsCount;
+	const { lotsCount, patentsCount } = runData.excelData;
 	const totalCount = lotsCount + patentsCount;
 
 	return (
@@ -103,20 +147,18 @@ const useRunData = () => {
 
 	useEffect(() => {
 		const loadRunData = () => {
-			const storedData = sessionStorage.getItem("newRunData");
-
-			if (!storedData) {
-				toast.error("No run data found. Please start over.");
-				router.push("/new-run");
-				return;
-			}
-
 			try {
+				const storedData = sessionStorage.getItem("newRunData");
+
+				if (!storedData) {
+					throw new Error("No run data found");
+				}
+
 				const parsedData = JSON.parse(storedData);
 				setRunData(parsedData);
 			} catch (error) {
-				console.error("Error parsing stored data:", error);
-				toast.error("Invalid run data. Please start over.");
+				console.error("Error loading run data:", error);
+				toast.error("No run data found. Please start over.");
 				router.push("/new-run");
 			} finally {
 				setIsLoading(false);
@@ -129,6 +171,50 @@ const useRunData = () => {
 	return { runData, isLoading };
 };
 
+// API functions
+const uploadFileToBlob = async (runData: RunData): Promise<string> => {
+	const response = await fetch("/api/blob/upload-file", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify(runData),
+	});
+
+	if (!response.ok) {
+		throw new Error(`Error uploading file: ${response.statusText}`);
+	}
+
+	const { blobName } = await response.json();
+	return blobName;
+};
+
+const createFabricRun = async (runData: RunData, blobName: string) => {
+	const params = {
+		runID: runData.runID,
+		runName: runData.runName,
+		runDescription: runData.description,
+		runClient: runData.client,
+		runFileSize: runData.fileSize,
+		runFileType: runData.fileType,
+		runBlobName: blobName,
+	};
+
+	const response = await fetch("/api/fabric/run-notebook", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({ params }),
+	});
+
+	if (!response.ok) {
+		throw new Error(`Error creating run: ${response.statusText}`);
+	}
+
+	return response;
+};
+
 // Main Component
 export default function ReviewPage() {
 	const router = useRouter();
@@ -139,26 +225,17 @@ export default function ReviewPage() {
 		if (!runData) return;
 
 		setIsSubmitting(true);
+
 		try {
+			// Remove stored data first
 			sessionStorage.removeItem("newRunData");
 
-			const response = await fetch("/api/blob/upload-file", {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(runData),
-			});
+			// Upload file to blob storage
+			const blobName = await uploadFileToBlob(runData);
 
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}));
-				throw new Error(
-					errorData.message ||
-						`HTTP error! status: ${response.status}`
-				);
-			}
+			// Create fabric run
+			await createFabricRun(runData, blobName);
 
-			await response.json();
 			toast.success("AST Run created successfully!");
 			router.replace("/dashboard");
 		} catch (error) {
@@ -166,7 +243,7 @@ export default function ReviewPage() {
 			toast.error(
 				error instanceof Error
 					? error.message
-					: "Error uploading file. Please try again."
+					: "An unexpected error occurred. Please try again."
 			);
 		} finally {
 			setIsSubmitting(false);
@@ -202,52 +279,7 @@ export default function ReviewPage() {
 				<CardContent className="space-y-6">
 					<div className="grid gap-4">
 						{/* Run Details */}
-						<div className="space-y-2">
-							<h3 className="text-sm font-medium text-muted-foreground">
-								Run Name
-							</h3>
-							<p className="text-lg font-semibold">
-								{runData.runName}
-							</p>
-						</div>
-
-						{runData.client && (
-							<div className="space-y-2">
-								<h3 className="text-sm font-medium text-muted-foreground">
-									Client
-								</h3>
-								<p className="text-base">{runData.client}</p>
-							</div>
-						)}
-
-						{runData.description && (
-							<div className="space-y-2">
-								<h3 className="text-sm font-medium text-muted-foreground">
-									Description
-								</h3>
-								<p className="text-base whitespace-pre-wrap">
-									{runData.description}
-								</p>
-							</div>
-						)}
-
-						<div className="space-y-2">
-							<h3 className="text-sm font-medium text-muted-foreground">
-								File
-							</h3>
-							<div className="flex items-center space-x-2">
-								<Badge variant="secondary">
-									{runData.fileName}
-								</Badge>
-								<span className="text-sm text-muted-foreground">
-									(
-									{(runData.fileSize / 1024 / 1024).toFixed(
-										2
-									)}{" "}
-									MB)
-								</span>
-							</div>
-						</div>
+						<RunDetails runData={runData} />
 
 						<Separator />
 
