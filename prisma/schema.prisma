@@ -1,0 +1,22 @@
+datasource db {
+    provider = "sqlserver"
+    url      = env("DATABASE_URL")
+}
+
+generator client {
+    provider = "prisma-client-js"
+    output   = "../node_modules/.prisma/client"
+}
+
+model ASTRun {
+    runId          String @id @unique
+    jobInstanceId  String
+    jobWorkspaceId String
+    location       String
+    parameters     String @default("{}") @db.Text
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
+
+    @@index([jobInstanceId])
+}
