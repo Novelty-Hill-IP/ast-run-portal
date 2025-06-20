@@ -1,3 +1,4 @@
+import { prisma } from "@/lib/db";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -77,6 +78,28 @@ export async function POST(request: Request) {
 				`Fabric API request failed: ${response.status} ${response.statusText}`
 			);
 		}
+
+		const location = response.headers.get("location");
+		const jobInstanceId = location?.match(
+			/\/jobs\/instances\/([^/]+)$/
+		)?.[1];
+		const jobWorkspaceId = location?.match(/\/workspaces\/([^/]+)\//)?.[1];
+
+		if (!location || !jobInstanceId || !jobWorkspaceId) {
+			throw new Error(
+				"Invalid response format from Fabric API. Missing required job information."
+			);
+		}
+
+		await prisma.ASTRun.create({
+			data: {
+				runId: parameters.runID,
+				location,
+				jobInstanceId,
+				jobWorkspaceId,
+				parameters: JSON.stringify(parameters),
+			},
+		});
 
 		return NextResponse.json(await response.text());
 	} catch (error) {

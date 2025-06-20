@@ -13,7 +13,7 @@ interface UploadRequest {
 	runID: string;
 }
 
-function validateUploadRequest(body: any): body is UploadRequest {
+function validateUploadRequest(body: UploadRequest): body is UploadRequest {
 	return (
 		typeof body.fileAsBase64 === "string" &&
 		typeof body.fileName === "string" &&
