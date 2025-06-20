@@ -205,7 +205,8 @@ export default function NewRunPage() {
 										</FormControl>
 										<FormDescription>
 											Upload an Excel file (.xlsx or .xls)
-											with "lots" and "patents" sheets
+											with &ldquo;lots&rdquo; and
+											&ldquo;patents&rdquo; sheets
 											containing the required schema.
 										</FormDescription>
 										<FormMessage />

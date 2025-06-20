@@ -41,7 +41,7 @@ export default function LoginPage() {
 			} else {
 				setError(data.error || "Authentication failed");
 			}
-		} catch (err) {
+		} catch {
 			setError("An error occurred. Please try again.");
 		} finally {
 			setIsLoading(false);
